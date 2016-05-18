@@ -1,7 +1,7 @@
 # -*- coding: UTF-8 -*-
 from pyspark import SparkContext
 import copy
-import math
+from math import pow, log, sqrt
 
 def detect_word(str):
 	if (str.startswith(str + '_') and str.endswith('_' + str)):
@@ -15,12 +15,32 @@ def doc_filter(str):
 	if (str.startswith('doc')):
 		return str
 
-'''
-Compare term-term relevenacy by taking two lists as arguments
-Used in both main problem and sub-problem
-'''
 def term_term_relevance():
-	print('hello from the other side')
+	mapA = 	sc.parallelize(termA) \
+			.zipWithIndex() \
+			.map (lambda a: (a[1], a[0]))
+
+	mapB = sc.parallelize(termB) \
+			.zipWithIndex() \
+			.map (lambda a: (a[1], a[0]))
+
+	numerator = mapA.union(mapB) \
+			.reduceByKey(lambda a,b: a*b) \
+			.map(lambda a: a[1]) \
+			.reduce(lambda x, y: x + y)
+
+	denominatorA = 	sc.parallelize(termA) \
+					.map(lambda a: pow(a,2)) \
+					.reduce(lambda x, y: x + y)
+
+	denominatorB = 	sc.parallelize(termB) \
+					.map(lambda a: pow(a,2)) \
+					.reduce(lambda x, y: x + y)
+
+	denominator = sqrt(denominatorA) * sqrt(denominatorB)
+
+	return (numerator / denominator)
+
 
 def idf_hash():
 	print('hello from the other side')
@@ -69,7 +89,7 @@ word_count = len(idf_vector_flattened)
 
 #Might need to change normalization formula
 idf_vector_normalized = sc.parallelize(idf_vector_flattened) \
-						.map(lambda x: (x[0], math.log(int(x[1]) / int(word_count)))) \
+						.map(lambda x: (x[0], log(int(x[1]) / int(word_count)))) \
 						.collect()
 
 #Converts it basically into a hash_table
