@@ -15,6 +15,18 @@ def doc_filter(str):
 	if (str.startswith('doc')):
 		return str
 
+'''
+Compare term-term relevenacy by taking two lists as arguments
+Used in both main problem and sub-problem
+'''
+def term_term_relevance():
+	print('hello from the other side')
+
+def idf_hash():
+	print('hello from the other side')
+#Returns idf value for input term
+
+
 #<TO_DO> Reduce amount of .collect()'s
 filename = "project2_sample.txt"
 sc = SparkContext("local", "TF-IDF")
@@ -69,15 +81,34 @@ idf_vector_normalized = sc.parallelize(idf_vector_flattened) \
 						.map(lambda x: (x[0], math.log(x[1] / word_count))) \
 						.collect()
 
+#Converts it basically into a hash_table
+#Inputting some key value will result in its corresponding value
+idf_dictionary = dict(idf_vector_normalized)
+
 '''
 Multiply each row of the TF vector by IDF vector
 HOW_TO: Take each element in TF vector's value section.
 		Map each value to its corresponding key:value pair in IDF vector
 
-FORMAT: TF： 	【 [DOC1], 【 (K1, V1), ... , (Kn, Vn) 】 】
+FORMAT: TF：【 [DOC1], 【 (K1, V1), ... , (Kn, Vn) 】 】
 								.
 								.
 			【 [DOCm], 【 (K1, V1), ... , (Kn, Vn) 】 】		
-		IDF：	【 (K1, V1), ... , (Kn, Vn) 】
+		IDF:【 (K1, V1), ... , (Kn, Vn) 】
 '''
+test_tf_list = [['doc1'], [('potato', 4), ('apple', 3)]]
+test_idf_list = dict([('potato', .5), ('banana', 5), ('apple', 95)])
 
+'''
+Use array[n] to access python's n element in lists
+Used for pairs as well
+Extract each tf vector's value component
+Map each of those values using Spark's RDD operations to a function 
+Boiled down: 	Get only SECOND value of each row of tf-vector
+				Parallelize into RDD, map each of those values from tf to tf-idf
+'''
+for row in tf_vector:
+	for pair in row:
+		pair[1] = 1
+
+# print(idf_vector_normalized)
