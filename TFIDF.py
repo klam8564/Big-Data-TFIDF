@@ -41,6 +41,13 @@ def term_term_relevance(termA, termB):
 
 	return (numerator / denominator)
 
+def sort_descending(input):
+	sorted_values = sc.parallelize(input) \
+	.map(lambda a: (a[1], a[0])) \
+	.sortByKey(False) \
+	.map(lambda a: (a[1], a[0])) \
+	.collect()
+	return sorted_values
 
 #<TO_DO> Reduce amount of .collect()'s
 filename = "project2_sample.txt"
