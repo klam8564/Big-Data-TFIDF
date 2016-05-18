@@ -1,8 +1,8 @@
+# -*- coding: UTF-8 -*-
 from pyspark import SparkContext
 import copy
 import math
 
-#<TO_DO> Move functions to seperate file
 def detect_word(str):
 	if (str.startswith(str + '_') and str.endswith('_' + str)):
 		return True
@@ -35,9 +35,11 @@ documents = sc.textFile(filename) \
 			.map(lambda line: line.split(" ")) \
 			.collect()
 
+
 #Crunches TF-vector
 #<TO_DO> Convert for loop to spark handling
 tf_vector = []
+idf_vector = []
 for document in documents:
 	tf_vector_row = []
 	doc_value = sc.parallelize(document) \
@@ -56,29 +58,18 @@ for document in documents:
 
 	tf_vector_row.append(doc_index)
 	tf_vector_row.append(doc_value)
-
+	idf_vector.extend(doc_value)
 	tf_vector.append(tf_vector_row)
 
 #Crunches IDF-vector
-idf_vector = copy.deepcopy(tf_vector)
-
-#Remove first element of every row, ifrst elemnent being the doc_index, second being 
-#<TO_DO> Change methodology of getting the elements from (x, y)'s y vector
-idf_vector_flat = []
-for row in idf_vector:
-	row.pop(0)
-	for element in row:
-		idf_vector_flat.extend(element)
-
-idf_vector_flattened = 	sc.parallelize(idf_vector_flat) \
-						.reduceByKey(lambda a, b: a + b) \
-						.collect()
+idf_vector_flattened = 	sc.parallelize(idf_vector) \
+						.countByKey() \
 
 word_count = len(idf_vector_flattened)
 
 #Might need to change normalization formula
 idf_vector_normalized = sc.parallelize(idf_vector_flattened) \
-						.map(lambda x: (x[0], math.log(x[1] / word_count))) \
+						.map(lambda x: (x[0], math.log(int(x[1]) / int(word_count)))) \
 						.collect()
 
 #Converts it basically into a hash_table
@@ -111,4 +102,3 @@ for row in tf_vector:
 	for pair in row:
 		pair[1] = 1
 
-# print(idf_vector_normalized)
