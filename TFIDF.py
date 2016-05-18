@@ -22,11 +22,6 @@ Used in both main problem and sub-problem
 def term_term_relevance():
 	print('hello from the other side')
 
-def idf_hash():
-	print('hello from the other side')
-#Returns idf value for input term
-
-
 #<TO_DO> Reduce amount of .collect()'s
 filename = "project2_sample.txt"
 sc = SparkContext("local", "TF-IDF")
@@ -62,18 +57,18 @@ for document in documents:
 	tf_vector.append(tf_vector_row)
 
 #Crunches IDF-vector
-idf_vector_flattened = 	sc.parallelize(idf_vector) \
-						.countByKey() \
-
+idf_vector_flattened_dict = sc.parallelize(idf_vector) \
+							.countByKey()	
+								
+idf_vector_flattened = [(k,v) for k,v in idf_vector_flattened_dict.items()]
+		
 word_count = len(idf_vector_flattened)
 
 #Might need to change normalization formula
 idf_vector_normalized = sc.parallelize(idf_vector_flattened) \
-						.map(lambda x: (x[0], math.log(int(x[1]) / int(word_count)))) \
+						.map(lambda x: (x[0], math.log(int(x[1]) / word_count))) \
 						.collect()
 
-#Converts it basically into a hash_table
-#Inputting some key value will result in its corresponding value
 idf_dictionary = dict(idf_vector_normalized)
 
 '''
@@ -98,7 +93,8 @@ Map each of those values using Spark's RDD operations to a function
 Boiled down: 	Get only SECOND value of each row of tf-vector
 				Parallelize into RDD, map each of those values from tf to tf-idf
 '''
-for row in tf_vector:
-	for pair in row:
-		pair[1] = 1
+
+# for row in tf_vector:
+# 	for pair in row[1]:
+# 		pair[1] *= idf_dictionary['t1']
 
