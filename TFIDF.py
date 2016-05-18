@@ -15,7 +15,7 @@ def doc_filter(str):
 	if (str.startswith('doc')):
 		return str
 
-def term_term_relevance():
+def term_term_relevance(termA, termB):
 	mapA = 	sc.parallelize(termA) \
 			.zipWithIndex() \
 			.map (lambda a: (a[1], a[0]))
@@ -86,7 +86,7 @@ word_count = len(idf_vector_flattened)
 
 #Might need to change normalization formula
 idf_vector_normalized = sc.parallelize(idf_vector_flattened) \
-						.map(lambda x: (x[0], log(int(x[1]) / int(word_count)))) \
+						.map(lambda x: (x[0], log(int(word_count) / int(x[1]) ))) \
 						.collect()
 
 idf_dictionary = dict(idf_vector_normalized)
