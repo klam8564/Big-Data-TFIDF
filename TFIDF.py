@@ -3,13 +3,10 @@ from pyspark import SparkContext
 import copy
 from math import pow, log, sqrt
 
-def detect_word(str):
-	if (str.startswith(str + '_') and str.endswith('_' + str)):
-		return True
-
-def word_filter(str):
-	if not(str.startswith('doc')):
-		return str
+def word_filter(word):
+	if ((word.startswith('gene_') and word.endswith('_gene')) \
+		or (word.startswith('disease_') and word.endswith('_disease'))):
+		return word
 
 def doc_filter(str):
 	if (str.startswith('doc')):
@@ -25,9 +22,9 @@ def term_term_relevance(termA, termB):
 			.map (lambda a: (a[1], a[0]))
 
 	numerator = topA.union(topB) \
-			.reduceByKey(lambda a,b: a*b) \
-			.map(lambda a: a[1]) \
-			.reduce(lambda x, y: x + y)
+				.reduceByKey(lambda a,b: a*b) \
+				.map(lambda a: a[1]) \
+				.reduce(lambda x, y: x + y)
 
 	bottomA = 	sc.parallelize(termA) \
 				.map(lambda a: pow(a,2)) \
@@ -56,16 +53,18 @@ def sort_descending(input):
 					.collect()
 	return sorted_values
 
-filename = "project2_sample.txt"
+filename = "project2_data.txt"
 sc = SparkContext("local", "TF-IDF")
+
+
 
 documents = sc.textFile(filename) \
 			.map(lambda line: line.split(" ")) \
 			.collect()
 			
 #Crunches TF-vector
-tf_vector = []
-idf_vector = []
+tf_vector 	= []
+idf_vector 	= []
 for document in documents:
 	tf_vector_row = []
 	doc_value = sc.parallelize(document) \
@@ -86,7 +85,7 @@ for document in documents:
 	tf_vector_row.append(doc_value)
 	idf_vector.extend(doc_value)
 	tf_vector.append(tf_vector_row)
-
+	
 #Crunches IDF-vector
 idf_vector_flattened_dict = sc.parallelize(idf_vector) \
 							.countByKey()	
@@ -102,6 +101,6 @@ idf_vector_normalized = sc.parallelize(idf_vector_flattened) \
 tf_idf = []
 for row in tf_vector:
 	tf_idf.append([row[0], tf_idf_merge(row[1], idf_vector_normalized)])
-
-
-
+	
+for row in tf_idf:
+	print(row)
