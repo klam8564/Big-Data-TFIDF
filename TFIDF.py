@@ -16,43 +16,46 @@ def doc_filter(str):
 		return str
 
 def term_term_relevance(termA, termB):
-	mapA = 	sc.parallelize(termA) \
+	topA = 	sc.parallelize(termA) \
 			.zipWithIndex() \
 			.map (lambda a: (a[1], a[0]))
 
-	mapB = sc.parallelize(termB) \
+	topB = 	sc.parallelize(termB) \
 			.zipWithIndex() \
 			.map (lambda a: (a[1], a[0]))
 
-	numerator = mapA.union(mapB) \
+	numerator = topA.union(topB) \
 			.reduceByKey(lambda a,b: a*b) \
 			.map(lambda a: a[1]) \
 			.reduce(lambda x, y: x + y)
 
-	denominatorA = 	sc.parallelize(termA) \
-					.map(lambda a: pow(a,2)) \
-					.reduce(lambda x, y: x + y)
+	bottomA = 	sc.parallelize(termA) \
+				.map(lambda a: pow(a,2)) \
+				.reduce(lambda x, y: x + y)
 
-	denominatorB = 	sc.parallelize(termB) \
-					.map(lambda a: pow(a,2)) \
-					.reduce(lambda x, y: x + y)
+	bottomB = 	sc.parallelize(termB) \
+				.map(lambda a: pow(a,2)) \
+				.reduce(lambda x, y: x + y)
 
-	denominator = sqrt(denominatorA) * sqrt(denominatorB)
+	denominator = sqrt(bottomA) * sqrt(bottomB)
 
 	return (numerator / denominator)
+	
+def tf_idf_merge(tf_values, idf_vector):
+	tf_dict = 	dict(tf_values)
+	tf_idf 	= 	sc.parallelize(idf_vector) \
+				.map(lambda pair: (pair[0], pair[1] * tf_dict.get(pair[0], 0))) \
+				.collect()
+	return tf_idf
 
-
-#<TO_DO> Reduce amount of .collect()'s
 filename = "project2_sample.txt"
 sc = SparkContext("local", "TF-IDF")
 
 documents = sc.textFile(filename) \
 			.map(lambda line: line.split(" ")) \
 			.collect()
-
-
+			
 #Crunches TF-vector
-#<TO_DO> Convert for loop to spark handling
 tf_vector = []
 idf_vector = []
 for document in documents:
@@ -82,39 +85,15 @@ idf_vector_flattened_dict = sc.parallelize(idf_vector) \
 								
 idf_vector_flattened = [(k,v) for k,v in idf_vector_flattened_dict.items()]
 		
-word_count = len(idf_vector_flattened)
+document_count = len(tf_vector)
 
-#Might need to change normalization formula
 idf_vector_normalized = sc.parallelize(idf_vector_flattened) \
-						.map(lambda x: (x[0], log(int(word_count) / int(x[1]) ))) \
+						.map(lambda x: (x[0], log(int(document_count) / int(x[1]) ))) \
 						.collect()
+						
+tf_idf = []
+for row in tf_vector:
+	tf_idf.append([row[0], tf_idf_merge(row[1], idf_vector_normalized)])
 
-idf_dictionary = dict(idf_vector_normalized)
 
-'''
-Multiply each row of the TF vector by IDF vector
-HOW_TO: Take each element in TF vector's value section.
-		Map each value to its corresponding key:value pair in IDF vector
-
-FORMAT: TF：【 [DOC1], 【 (K1, V1), ... , (Kn, Vn) 】 】
-								.
-								.
-			【 [DOCm], 【 (K1, V1), ... , (Kn, Vn) 】 】		
-		IDF:【 (K1, V1), ... , (Kn, Vn) 】
-'''
-test_tf_list = [['doc1'], [('potato', 4), ('apple', 3)]]
-test_idf_list = dict([('potato', .5), ('banana', 5), ('apple', 95)])
-
-'''
-Use array[n] to access python's n element in lists
-Used for pairs as well
-Extract each tf vector's value component
-Map each of those values using Spark's RDD operations to a function 
-Boiled down: 	Get only SECOND value of each row of tf-vector
-				Parallelize into RDD, map each of those values from tf to tf-idf
-'''
-
-# for row in tf_vector:
-# 	for pair in row[1]:
-# 		pair[1] *= idf_dictionary['t1']
 
