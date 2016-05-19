@@ -48,6 +48,14 @@ def tf_idf_merge(tf_values, idf_vector):
 				.collect()
 	return tf_idf
 
+def sort_descending(input):
+	sorted_values = sc.parallelize(input) \
+					.map(lambda a: (a[1], a[0])) \
+					.sortByKey(False) \
+					.map(lambda a: (a[1], a[0])) \
+					.collect()
+	return sorted_values
+
 filename = "project2_sample.txt"
 sc = SparkContext("local", "TF-IDF")
 
