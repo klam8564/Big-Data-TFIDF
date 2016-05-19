@@ -1,106 +1,52 @@
 # -*- coding: UTF-8 -*-
 from pyspark import SparkContext
-import copy
-from math import pow, log, sqrt
-
-def word_filter(word):
-	if ((word.startswith('gene_') and word.endswith('_gene')) \
-		or (word.startswith('disease_') and word.endswith('_disease'))):
-		return word
-
+from math import log10
+import time
 def doc_filter(str):
-	if (str.startswith('doc')):
+	if (str.startswith('doc')) and str[3:].isdigit():
 		return str
-
-def term_term_relevance(termA, termB):
-	topA = 	sc.parallelize(termA) \
-			.zipWithIndex() \
-			.map (lambda a: (a[1], a[0]))
-
-	topB = 	sc.parallelize(termB) \
-			.zipWithIndex() \
-			.map (lambda a: (a[1], a[0]))
-
-	numerator = topA.union(topB) \
-				.reduceByKey(lambda a,b: a*b) \
-				.map(lambda a: a[1]) \
-				.reduce(lambda x, y: x + y)
-
-	bottomA = 	sc.parallelize(termA) \
-				.map(lambda a: pow(a,2)) \
-				.reduce(lambda x, y: x + y)
-
-	bottomB = 	sc.parallelize(termB) \
-				.map(lambda a: pow(a,2)) \
-				.reduce(lambda x, y: x + y)
-
-	denominator = sqrt(bottomA) * sqrt(bottomB)
-
-	return (numerator / denominator)
-	
-def tf_idf_merge(tf_values, idf_vector):
-	tf_dict = 	dict(tf_values)
-	tf_idf 	= 	sc.parallelize(idf_vector) \
-				.map(lambda pair: (pair[0], pair[1] * tf_dict.get(pair[0], 0))) \
-				.collect()
-	return tf_idf
-
-def sort_descending(input):
-	sorted_values = sc.parallelize(input) \
-					.map(lambda a: (a[1], a[0])) \
-					.sortByKey(False) \
-					.map(lambda a: (a[1], a[0])) \
-					.collect()
-	return sorted_values
-
-filename = "project2_data.txt"
-sc = SparkContext("local", "TF-IDF")
-
-
-
-documents = sc.textFile(filename) \
-			.map(lambda line: line.split(" ")) \
-			.collect()
-			
-#Crunches TF-vector
-tf_vector 	= []
-idf_vector 	= []
-for document in documents:
-	tf_vector_row = []
-	doc_value = sc.parallelize(document) \
-				.map(lambda word: word_filter(word)) \
-				.filter(lambda x: x!=None) \
-				.map(lambda word: (word, 1)) \
-				.reduceByKey(lambda a, b: a + b) \
-				.collect()
-
-#Extracts the document index
-#<TO_DO> Better way to do it in spark
-	doc_index = sc.parallelize(document) \
-				.map(lambda word: doc_filter(word)) \
-				.filter(lambda x: x!=None) \
-				.collect()
-
-	tf_vector_row.append(doc_index)
-	tf_vector_row.append(doc_value)
-	idf_vector.extend(doc_value)
-	tf_vector.append(tf_vector_row)
-	
-#Crunches IDF-vector
-idf_vector_flattened_dict = sc.parallelize(idf_vector) \
-							.countByKey()	
-								
-idf_vector_flattened = [(k,v) for k,v in idf_vector_flattened_dict.items()]
 		
-document_count = len(tf_vector)
-
-idf_vector_normalized = sc.parallelize(idf_vector_flattened) \
-						.map(lambda x: (x[0], log(int(document_count) / int(x[1]) ))) \
-						.collect()
-						
-tf_idf = []
-for row in tf_vector:
-	tf_idf.append([row[0], tf_idf_merge(row[1], idf_vector_normalized)])
+def tf_word_filter(list):
+	filtered = {}
+	for word in list:
+		if ((word.startswith('gene_') and word.endswith('_gene')) \
+			or (word.startswith('disease_') and word.endswith('_disease'))):
+			filtered[word] = filtered.get(word, 0) + 1
+	return filtered
 	
-for row in tf_idf:
-	print(row)
+def df_word_filter(list):
+	filtered = []
+	for word in list:
+		if ((word.startswith('gene_') and word.endswith('_gene')) \
+			or (word.startswith('disease_') and word.endswith('_disease'))):
+			filtered.append(word)
+	return set(filtered)
+
+def tfidf_join(tf,idf):
+
+	tfidf = []
+	for tf_term in tf:
+		tfidf.append((tf_term, tf[tf_term]*idf[tf_term]))
+	return tfidf
+	
+if __name__ == "__main__":
+	filename = "project2_data.txt"
+	sc = SparkContext(appName="TF-IDF")
+	
+	tf = 	sc.textFile(filename).map(lambda line: line.split(" ")) \
+			.map(lambda x: (x[0], tf_word_filter(x[1:])))
+				
+	corpus_size = tf.count()
+	
+	df =	sc.textFile(filename).map(lambda line: line.split(" ")) \
+			.flatMap(lambda x: list(df_word_filter(x[1:]))) \
+			.map(lambda x: (x, 1)) \
+			.reduceByKey(lambda x, y: x + y)
+			
+	idf =	dict(df.map(lambda x: (x[0], log10(corpus_size/x[1]))).collect())
+			
+	tfidf = tf.map(lambda x: (x[0], tfidf_join(x[1], idf)))
+	
+	
+	save = 	tfidf.coalesce(1).saveAsTextFile('test_out_'+str(time.time()))
+	
