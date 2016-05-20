@@ -66,6 +66,7 @@ def semantic_similarity(vectorA, vectorB):
 					sqrt(sum(i ** 2 for i in vectorB))
 	if(denominator != 0):
 		return numerator / denominator
+		
 if __name__ == "__main__":
 	filename = "project2_data.txt"
 	sc = SparkContext(appName="TF-IDF")
@@ -81,10 +82,6 @@ if __name__ == "__main__":
 			.reduceByKey(lambda x, y: x + y)
 			
 	idf =	dict(df.map(lambda x: (x[0], log10(corpus_size/x[1]))).collect())
-
-	# idffilepath = 'IDF_out_txt'
-	# with open(idffilepath, 'w') as file:
-	# 	file.write("{}\n".format(idf))
 		
 	tfidf = tf.map(lambda x: (x[0], tfidf_join(x[1], idf)))
 	
@@ -98,19 +95,15 @@ if __name__ == "__main__":
 	
 	term_term = sc.parallelize(idf)
 	
-	# term_term_save = term_term.coalesce(1).saveAsTextFile('term_term_'+str(time.time()))
-	
 	lookup = tfidf.collect()
 	term_vectors = term_term.map(lambda x: (x, fetch_term_vector(lookup, x)))
 	combinations =  []
 	for pair in itertools.combinations(term_vectors.collect(), 2):
 		combinations.append(pair)
-	
-	# for row in combinations:
-	# 	print(row)	
+		
 	term_pairs = 	sc.parallelize(combinations) \
 					.map(lambda x: ((x[0][0],x[1][0]), semantic_similarity(x[0][1], x[1][1]))) \
 					.filter(lambda x: x[1] != 0) \
 					.sortBy(lambda x: -x[1])
 	
-	term_pair_save = term_pairs.saveAsTextFile('term_pairs_'+str(time.time()))
+	# term_pair_save = term_pairs.saveAsTextFile('term_pairs_'+str(time.time()))
