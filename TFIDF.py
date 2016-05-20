@@ -1,6 +1,6 @@
 # -*- coding: UTF-8 -*-
 from pyspark import SparkContext
-from math import log10, sqrt
+from math import log10, pow, sqrt
 import time
 import itertools
 def doc_filter(str):
@@ -29,6 +29,75 @@ def tfidf_join(tf,idf):
 	for tf_term in tf:
 		tfidf.append((tf_term, tf[tf_term]*idf[tf_term]))
 	return dict(tfidf)
+
+def term_term_relevance(termA, termB):
+
+	multiplication_list = []
+	power_list_A = []
+	power_list_B = []
+	for elementA in termA:
+		power_list_A.append(pow(elementA, 2))
+		
+	multiplication_list = [a*b for a,b in zip(termA, termB)]
+	
+	for elementB in termB:
+		power_list_B.append(pow(elementB, 2))
+
+	numerator = sum(multiplication_list)
+
+	bottomA = sum(power_list_A)
+
+	bottomB = sum(power_list_B) 
+
+	denominator = sqrt(bottomA) * sqrt(bottomB)
+
+	#divide by 0 error catch
+	if denominator != 0:
+		return (numerator / denominator)
+	else:
+		return 0
+
+def sort_descending(input):
+	sorted_values = sorted(input, key=lambda tup: -tup[2])
+	return sorted_values
+
+
+def term_term_query(tf_idf, query_term):
+	f = open('query_result.txt','w')
+	query_list = []
+	for element in tf_idf:
+		query_list.append(element[1].get(query_term, 0))
+
+	dictionary_keys = []
+
+	for element in tf_idf:
+		for key in element[1]:
+			if key != query_term:
+				dictionary_keys.append(key)
+
+	#takes distinct values
+	dictionary_keys = list(set(dictionary_keys))
+	key_list = []
+	corpus_list = []
+
+	for key in dictionary_keys:
+		score_list = []
+		key_list.append(key)
+		for element in tf_idf:
+			score_list.append(element[1].get(key,0))
+		corpus_list.append(score_list)
+
+	relevance_list = []
+	for index, element in enumerate(corpus_list):
+			relevance_list.append((query_term, key_list[index], term_term_relevance(list(element),query_list)))
+
+	nonzero_list = 	sc.parallelize(relevance_list) \
+					.filter(lambda a: a[2] > 0) \
+					.collect()
+
+	descending_list = sort_descending(nonzero_list)
+	f.write(str(descending_list))
+	print("File written successfully.")
 	
 def tfidf_print_zero_filled(tfidf, idf):
 	print_spooler = []
@@ -51,9 +120,6 @@ def tfidf_print(tfidf, idf):
 			print_spooler.append((row[0], row[1]))
 	return print_spooler
 	
-def term_term_relevancy():
-	return 1
-	
 def fetch_term_vector(tfidf, term):
 	term_vector = []
 	for row in tfidf:
@@ -68,7 +134,7 @@ def semantic_similarity(vectorA, vectorB):
 		return numerator / denominator
 		
 if __name__ == "__main__":
-	filename = "project2_data.txt"
+	filename = "project2_relevance.txt"
 	sc = SparkContext(appName="TF-IDF")
 	
 	tf = 	sc.textFile(filename).map(lambda line: line.split(" ")) \
@@ -107,3 +173,4 @@ if __name__ == "__main__":
 					.sortBy(lambda x: -x[1])
 	
 	# term_pair_save = term_pairs.saveAsTextFile('term_pairs_'+str(time.time()))
+	term_term_query(tfidf.collect(), "gene_nmdars_gene")
